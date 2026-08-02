@@ -1,0 +1,37 @@
+# =====================================================================
+#  Vanguard Panel — Fly.io config
+#  App name is overridden by whatever app the deploy targets.
+#  DO NOT put secrets here — use `fly secrets set` or the Secrets UI.
+# =====================================================================
+app = "vanguard-panel"
+primary_region = "cdg"
+
+[build]
+
+[env]
+  PORT = "8080"
+  DB_PATH = "/data/vanguard.db"
+  FILES_DIR = "/data/files"
+
+[[mounts]]
+  source = "vanguard_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
+  cpus = 1

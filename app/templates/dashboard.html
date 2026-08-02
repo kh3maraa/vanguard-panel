@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord{% endblock %}
+{% block heading %}Bienvenue, {{ current_user.username|capitalize }}.{% endblock %}
+{% block sub %}Voici un aperçu de votre panel.{% endblock %}
+
+{% block content %}
+
+<div class="grid-2">
+
+  <!-- Applications rapides -->
+  <div class="card">
+    <div class="card-head">
+      <h2>Applications</h2>
+      <a class="btn ghost sm" href="{{ url_for('admin.apps') }}">Voir tout</a>
+    </div>
+    {% if apps %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Nom</th><th>Version</th><th>Statut</th></tr></thead>
+        <tbody>
+        {% for a in apps[:6] %}
+          <tr>
+            <td><a href="{{ url_for('admin.app_detail', aid=a.id) }}"><strong>{{a.name}}</strong></a></td>
+            <td class="mono">{{a.version}}</td>
+            <td>{% if a.disabled %}<span class="badge danger">Désactivée</span>{% else %}<span class="badge success">Active</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="card-sub">Aucune application. <a href="{{ url_for('admin.apps') }}">Créez-en une</a>.</p>
+    {% endif %}
+  </div>
+
+  <!-- Activité récente avec refresh + clean -->
+  <div class="card">
+    <div class="card-head">
+      <h2>Activité récente</h2>
+      <div class="card-head-actions">
+        <a class="btn ghost sm" href="{{ url_for('admin.dashboard') }}">↻ Refresh</a>
+        <form method="POST" action="{{ url_for('admin.logs_clear') }}" style="display:inline"
+              onsubmit="return confirm('Supprimer TOUS les logs ? Action irréversible.')">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn danger sm" type="submit">Clean logs</button>
+        </form>
+      </div>
+    </div>
+    {% if recent %}
+    <ul class="activity-list">
+      {% for r in recent %}
+      <li>
+        <div class="a-icon
+          {% if 'fail' in r.action or 'banned' in r.action or 'blacklisted' in r.action %}danger
+          {% elif 'ok' in r.action or 'register' in r.action or 'sync' in r.action %}success
+          {% else %}accent{% endif %}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <div class="a-body">
+          <div class="a-title">{{r.action}}</div>
+          <div class="a-sub muted">{{r.identifier or '—'}} · {{r.rel_time}}</div>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="card-sub">Rien pour le moment.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+<!-- Dernières clés créées -->
+<div class="card">
+  <div class="card-head">
+    <h2>Dernières clés</h2>
+    <a class="btn ghost sm" href="{{ url_for('admin.licenses') }}">Voir toutes</a>
+  </div>
+  {% if latest_keys %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Clé</th><th>App</th><th>Jours</th><th>Utilisations</th><th>Statut</th></tr></thead>
+      <tbody>
+        {% for k in latest_keys %}
+        <tr>
+          <td><code>{{k.key}}</code></td>
+          <td>{{k.app_name or '—'}}</td>
+          <td>{{k.duration_days}}</td>
+          <td class="mono">{{k.usage_count or 0}}</td>
+          <td>
+            {% if k.banned %}<span class="badge danger">Banni</span>
+            {% elif not k.activated_at %}<span class="badge warn">En attente</span>
+            {% elif k.expires_at and k.expires_at < now_ts %}<span class="badge danger">Expirée</span>
+            {% else %}<span class="badge success">Active</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="card-sub">Aucune clé pour l'instant.</p>
+  {% endif %}
+</div>
+
+{% endblock %}

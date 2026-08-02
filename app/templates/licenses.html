@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Clés{% endblock %}
+{% block heading %}Clés{% endblock %}
+{% block sub %}Générez et gérez vos clés d'accès.{% endblock %}
+
+{% block content %}
+
+{% if newly_generated %}
+<div class="card">
+  <div class="card-head"><h2>{{ newly_generated|length }} clé(s) générée(s)</h2></div>
+  <p class="card-sub">Copiez-les maintenant, elles sont aussi visibles dans la liste.</p>
+  <pre>{% for k in newly_generated %}{{ k }}
+{% endfor %}</pre>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head" style="justify-content:space-between;align-items:center">
+    <h2>Générateur</h2>
+    {% if apps %}
+    <form method="POST" action="{{ url_for('admin.app_purge_hwids', aid=apps[0].id) }}"
+          style="display:inline"
+          onsubmit="return confirm('Purger TOUS les HWID bindings + sessions de l\'app ? Toutes les clés seront libérées, aucune ne sera supprimée.')">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn warn sm" type="submit" title="Libère tous les HWID de toutes les clés">🧹 Purge tous les HWIDs</button>
+    </form>
+    {% endif %}
+  </div>
+  <form method="POST" action="{{ url_for('admin.licenses_generate') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Application</label>
+        <select name="app_id" required>
+          {% for a in apps %}<option value="{{a.id}}">{{a.name}}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nombre</label>
+        <input type="number" name="count" value="1" min="1" max="500">
+      </div>
+      <div class="form-group">
+        <label>Jours</label>
+        <input type="number" name="days" value="30" min="1">
+      </div>
+      <div class="form-group">
+        <label>HWID max</label>
+        <input type="number" name="max_hwids" value="1" min="1">
+      </div>
+      <div class="form-group">
+        <label>Note</label>
+        <input name="note" placeholder="Optionnel">
+      </div>
+    </div>
+    <button class="btn" type="submit">Générer</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Toutes les clés</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th><th>Clé</th><th>App</th><th>Durée</th><th>HWIDs</th>
+          <th>Utilisations</th><th>Activée</th><th>Expire</th><th>Statut</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in licenses %}
+        <tr>
+          <td>#{{l.id}}</td>
+          <td><code>{{l.key}}</code></td>
+          <td>{{l.app_id}}</td>
+          <td class="mono">{{l.duration_days}} j</td>
+          <td>{{l.max_hwids}}</td>
+          <td class="mono"><strong>{{l.usage_count or 0}}</strong></td>
+          <td>{{l.activated_at or '—'}}</td>
+          <td>{{l.expires_at or '—'}}</td>
+          <td>
+            {% if l.banned %}<span class="badge danger">Banni</span>
+            {% elif not l.activated_at %}<span class="badge warn">En attente</span>
+            {% elif l.expires_at and l.expires_at < now_ts %}<span class="badge danger">Expirée</span>
+            {% else %}<span class="badge success">Active</span>{% endif %}
+          </td>
+          <td>
+            <div class="actions" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+
+              <!-- Reset HWID -->
+              <form method="POST" action="{{ url_for('admin.license_reset_hwid', lid=l.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn ghost sm" type="submit" title="Débloque le HWID lié">Reset HWID</button>
+              </form>
+
+              <!-- Modifier durée totale (jours) -->
+              <form method="POST" action="{{ url_for('admin.license_set_duration', lid=l.id) }}"
+                    style="display:flex;gap:4px;align-items:center">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="number" name="days" value="{{ l.duration_days }}" min="1"
+                       style="width:70px" title="Durée totale en jours">
+                <button class="btn ghost sm" type="submit" title="Écrase la durée totale et recalcule l'expiration">Set</button>
+              </form>
+
+              <!-- Add time (presets) -->
+              <form method="POST" action="{{ url_for('admin.license_add_time', lid=l.id) }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="days" value="1">
+                <button class="btn ghost sm" type="submit" title="+1 jour">+1j</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.license_add_time', lid=l.id) }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="days" value="7">
+                <button class="btn ghost sm" type="submit">+7j</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.license_add_time', lid=l.id) }}" style="display:inline">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="days" value="30">
+                <button class="btn ghost sm" type="submit">+30j</button>
+              </form>
+
+              <!-- Add time custom -->
+              <form method="POST" action="{{ url_for('admin.license_add_time', lid=l.id) }}"
+                    style="display:flex;gap:4px;align-items:center">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="number" name="days" placeholder="jours" min="1" style="width:70px">
+                <button class="btn sm" type="submit" title="Ajoute N jours à l'expiration">+Add</button>
+              </form>
+
+              <!-- Delete -->
+              <form method="POST" action="{{ url_for('admin.license_delete', lid=l.id) }}"
+                    onsubmit="return confirm('Supprimer cette clé ? La clé deviendra inconnue au client.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger sm" type="submit">Suppr.</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="10" class="empty">Aucune clé pour l'instant.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

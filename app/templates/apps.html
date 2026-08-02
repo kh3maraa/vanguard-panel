@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Applications{% endblock %}
+{% block heading %}Applications{% endblock %}
+{% block sub %}Gérez vos applications et leurs credentials.{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head"><h2>Nouvelle application</h2></div>
+  <form method="POST" action="{{ url_for('admin.app_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-row">
+      <div class="form-group" style="flex:2">
+        <label>Nom de l'application</label>
+        <input name="name" placeholder="ex: mon-super-tool" required>
+      </div>
+      <div class="form-group" style="flex:0 0 auto; display:flex; align-items:flex-end">
+        <button class="btn" type="submit">Créer l'application</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Toutes les applications</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Nom</th><th>Version</th><th>HWID Lock</th><th>Intégrité</th><th>Statut</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for a in apps %}
+        <tr>
+          <td>#{{a.id}}</td>
+          <td><a href="{{ url_for('admin.app_detail', aid=a.id) }}" style="color:var(--text);font-weight:600">{{a.name}}</a></td>
+          <td><code>{{a.version}}</code></td>
+          <td>{% if a.hwid_lock %}<span class="badge success">Activé</span>{% else %}<span class="badge warn">Désactivé</span>{% endif %}</td>
+          <td>{% if a.integrity_check %}<span class="badge success">HMAC</span>{% else %}<span class="badge warn">Off</span>{% endif %}</td>
+          <td>{% if a.disabled %}<span class="badge danger">Désactivée</span>{% else %}<span class="badge success dot">Live</span>{% endif %}</td>
+          <td><a href="{{ url_for('admin.app_detail', aid=a.id) }}" class="btn ghost sm">Gérer</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">Aucune application. Créez-en une pour commencer.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

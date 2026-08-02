@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Paramètres{% endblock %}
+{% block heading %}Paramètres{% endblock %}
+{% block sub %}Compte administrateur et sécurité.{% endblock %}
+
+{% block content %}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Changer le mot de passe</h2></div>
+    <form method="POST" action="{{ url_for('admin.settings_password') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label>Mot de passe actuel</label>
+        <input name="current" type="password" required>
+      </div>
+      <div class="form-group">
+        <label>Nouveau mot de passe</label>
+        <input name="new" type="password" minlength="8" required>
+      </div>
+      <div class="form-group">
+        <label>Confirmer</label>
+        <input name="new2" type="password" minlength="8" required>
+      </div>
+      <button class="btn" type="submit">Mettre à jour</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Créer un autre admin</h2></div>
+    <p class="card-sub">Ajoute un nouveau compte administrateur.</p>
+    <form method="POST" action="{{ url_for('admin.settings_new_admin') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label>Nom d'utilisateur</label>
+        <input name="username" required>
+      </div>
+      <div class="form-group">
+        <label>Mot de passe</label>
+        <input name="password" type="password" minlength="8" required>
+      </div>
+      <button class="btn" type="submit">Créer l'admin</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Comptes administrateurs</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>Username</th><th>Créé le</th><th></th></tr></thead>
+      <tbody>
+        {% for a in admins %}
+        <tr>
+          <td>#{{a.id}}</td>
+          <td>{{a.username}}{% if a.id == current_user.id %} <span class="badge accent">Vous</span>{% endif %}</td>
+          <td>{{a.created_at}}</td>
+          <td>
+            {% if a.id != current_user.id %}
+            <form method="POST" action="{{ url_for('admin.settings_delete_admin', aid=a.id) }}"
+                  onsubmit="return confirm('Supprimer ce compte admin ?')">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn danger sm">Supprimer</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

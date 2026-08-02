@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Webhooks{% endblock %}
+{% block heading %}Webhooks{% endblock %}
+{% block sub %}Notifications HTTP sur événements (login, fail, ban).{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head"><h2>Nouveau webhook</h2></div>
+  <form method="POST" action="{{ url_for('admin.hook_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Application</label>
+        <select name="app_id" required>{% for a in apps %}<option value="{{a.id}}">{{a.name}}</option>{% endfor %}</select>
+      </div>
+      <div class="form-group" style="flex:3">
+        <label>URL</label>
+        <input name="url" placeholder="https://votre-endpoint.com/hook" required>
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Événements (csv)</label>
+        <input name="events" value="login,fail,ban">
+      </div>
+      <div class="form-group" style="display:flex;align-items:flex-end">
+        <button class="btn" type="submit">Créer</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Tous les webhooks</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>App</th><th>URL</th><th>Événements</th><th>Secret</th><th>Statut</th><th></th></tr></thead>
+      <tbody>
+        {% for h in hooks %}
+        <tr>
+          <td>#{{h.id}}</td><td>{{h.app_id}}</td><td class="muted">{{h.url}}</td>
+          <td><code>{{h.events}}</code></td>
+          <td><code>{{h.secret[:16]}}…</code></td>
+          <td>{% if h.active %}<span class="badge success">Actif</span>{% else %}<span class="badge warn">Inactif</span>{% endif %}</td>
+          <td>
+            <div class="actions">
+              <form method="POST" action="{{ url_for('admin.hook_toggle', hid=h.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn ghost sm" type="submit">Toggle</button>
+              </form>
+              <form method="POST" action="{{ url_for('admin.hook_delete', hid=h.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <button class="btn danger sm" type="submit">Suppr.</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">Aucun webhook.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

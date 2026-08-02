@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Variables{% endblock %}
+{% block heading %}Variables{% endblock %}
+{% block sub %}Variables publiques et secrètes accessibles via l'API.{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head"><h2>Nouvelle variable</h2></div>
+  <form method="POST" action="{{ url_for('admin.var_new') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Application</label>
+        <select name="app_id" required>{% for a in apps %}<option value="{{a.id}}">{{a.name}}</option>{% endfor %}</select>
+      </div>
+      <div class="form-group">
+        <label>Nom</label>
+        <input name="name" required>
+      </div>
+      <div class="form-group" style="flex:2">
+        <label>Valeur</label>
+        <input name="value" required>
+      </div>
+      <div class="form-group">
+        <label>Tier min</label>
+        <input name="min_sub_level" type="number" value="0" min="0">
+      </div>
+    </div>
+    <div class="switch-row">
+      <div><div class="label">Variable secrète</div><div class="desc">Nécessite une session client valide pour être lue.</div></div>
+      <label class="switch"><input type="checkbox" name="secret"></label>
+    </div>
+    <button class="btn" type="submit">Ajouter</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Toutes les variables</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ID</th><th>App</th><th>Nom</th><th>Type</th><th>Tier</th><th>Valeur</th><th></th></tr></thead>
+      <tbody>
+        {% for v in vars %}
+        <tr>
+          <td>#{{v.id}}</td><td>{{v.app_id}}</td><td>{{v.name}}</td>
+          <td>{% if v.secret %}<span class="badge accent">Secrète</span>{% else %}<span class="badge success">Publique</span>{% endif %}</td>
+          <td>{{v.min_sub_level}}</td>
+          <td><code>{{v.value[:80]}}</code></td>
+          <td><form method="POST" action="{{ url_for('admin.var_delete', vid=v.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn danger sm" type="submit">Suppr.</button>
+          </form></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="empty">Aucune variable.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

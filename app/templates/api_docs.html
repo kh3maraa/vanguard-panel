@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}API{% endblock %}
+{% block heading %}API{% endblock %}
+{% block sub %}Documentation des endpoints et exemple de client SDK.{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-head"><h2>Base URL</h2></div>
+  <p class="card-sub">Toutes les requêtes doivent être signées HMAC-SHA256 (voir SDK).</p>
+  <input value="{{ request.url_root }}api/v1" readonly onclick="this.select()">
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Endpoints</h2></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Méthode</th><th>Path</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/init</code></td><td>Handshake initial + version</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/license</code></td><td>Login par clé (activation, HWID lock)</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/hwid/sync</code></td><td>Rebind la license au nouveau HWID après spoof</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/register</code></td><td>Enregistrer un user avec une clé</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/login</code></td><td>Login username/password</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/session/check</code></td><td>Valider la session en cours</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/variable</code></td><td>Lire une variable (secret si tier)</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/file</code></td><td>Télécharger un fichier protégé</td></tr>
+        <tr><td><span class="badge accent">POST</span></td><td><code>/api/v1/logout</code></td><td>Terminer la session</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Signature HMAC</h2></div>
+  <p class="card-sub">Chaque requête doit inclure ces headers :</p>
+  <ul style="list-style:none;padding:0;margin:0 0 16px 0;font-size:13px;">
+    <li style="padding:4px 0"><code>X-App-Name</code> — nom de votre application</li>
+    <li style="padding:4px 0"><code>X-Timestamp</code> — timestamp Unix (secondes)</li>
+    <li style="padding:4px 0"><code>X-Nonce</code> — nonce unique (UUID v4)</li>
+    <li style="padding:4px 0"><code>X-Signature</code> — HMAC-SHA256 hex de <code>ts.nonce.payload</code></li>
+  </ul>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Client SDK (JavaScript)</h2></div>
+<pre><code>async function signedFetch(url, appName, appSecret, body) {
+  const ts = Math.floor(Date.now() / 1000).toString();
+  const nonce = crypto.randomUUID();
+  const payload = JSON.stringify(body);
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(appSecret),
+    { name:"HMAC", hash:"SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${ts}.${nonce}.${payload}`));
+  const hex = [...new Uint8Array(sig)].map(b =&gt; b.toString(16).padStart(2,"0")).join("");
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-App-Name": appName,
+      "X-Timestamp": ts,
+      "X-Nonce": nonce,
+      "X-Signature": hex
+    },
+    body: payload
+  }).then(r =&gt; r.json());
+}
+
+// Usage :
+const r = await signedFetch(
+  "{{ request.url_root }}api/v1/license",
+  "mon-app", "TON_API_SECRET",
+  { key: "VNGD-XXXX-XXXX-XXXX-XXXX-XXXX", hwid: "abc123def456" }
+);
+console.log(r);</code></pre>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Exemple Python</h2></div>
+<pre><code>import time, uuid, hmac, hashlib, json, requests
+
+def signed_call(app_name, app_secret, endpoint, body):
+    ts = str(int(time.time()))
+    nonce = str(uuid.uuid4())
+    payload = json.dumps(body, separators=(",", ":"))
+    sig = hmac.new(
+        app_secret.encode(),
+        f"{ts}.{nonce}.{payload}".encode(),
+        hashlib.sha256
+    ).hexdigest()
+    return requests.post(
+        "{{ request.url_root }}api/v1/" + endpoint,
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "X-App-Name": app_name,
+            "X-Timestamp": ts,
+            "X-Nonce": nonce,
+            "X-Signature": sig
+        }
+    ).json()
+
+r = signed_call("mon-app", "TON_API_SECRET", "license", {
+    "key": "VNGD-XXXX-XXXX-XXXX-XXXX-XXXX",
+    "hwid": "abc123"
+})
+print(r)</code></pre>
+</div>
+{% endblock %}

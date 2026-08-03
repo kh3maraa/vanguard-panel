@@ -111,12 +111,26 @@ def license_login():
                                             "owner_lic": other_bind.license_id})
             return jsonify(success=False, message="hwid already bound to another license"), 403
 
-        # Per-license bindings (max_hwids par cle -- normalement 1)
+        # Per-license bindings (max_hwids par cle -- normalement 1).
+        #
+        # POST-SPOOF REBIND: si le HWID courant n'existe pas encore parmi les
+        # bindings de CETTE license ET qu'on a atteint la limite, on considere
+        # ca comme une rotation legitime de machine (spoof) tant que le HWID
+        # n'appartient a AUCUNE autre license (le check `other_bind` juste
+        # au-dessus garantit deja ca). On drop les anciens bindings et on
+        # pose le nouveau -- l'invariant "1 cle = 1 device actif" reste vrai.
+        # Ca evite le blocage "HWID limit reached" quand le /hwid/sync
+        # post-spoof a echoue (reseau, DNS apres rotation MAC) et que
+        # l'utilisateur redemarre puis se reconnecte avec la meme cle.
         binds = HwidBinding.query.filter_by(license_id=lic.id).all()
         if not any(b.hwid == hwid for b in binds):
             if len(binds) >= lic.max_hwids:
-                add_log(g.app.id, "hwid_limit", ip, hwid, key)
-                return jsonify(success=False, message="HWID limit reached"), 403
+                HwidBinding.query.filter_by(license_id=lic.id).delete()
+                lic.usage_count = (lic.usage_count or 0) + 1
+                add_log(g.app.id, "hwid_rebind", ip, hwid, key,
+                        f"replaced {len(binds)} binding(s) on login (spoof rotation)")
+                fire_webhook(g.app.id, "hwid_sync",
+                             {"key": key, "ip": ip, "hwid": hwid, "via": "login"})
             db.session.add(HwidBinding(license_id=lic.id, hwid=hwid, ip=ip))
         else:
             for b in binds:

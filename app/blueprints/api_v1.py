@@ -184,11 +184,15 @@ def hwid_sync():
         add_log(g.app.id, "hwid_sync_banned", ip, new_hwid, key)
         return jsonify(success=False, message="License banned"), 403
 
-    # --- STRICT LOCK au sync ---
-    # Le sync ne peut PAS voler un HWID a une autre cle. Il ne peut que:
-    #   - poser le nouveau HWID s'il est libre
-    #   - remplacer le HWID actuel de la meme cle (cas spoof normal)
-    other_bind = (
+    # --- STEAL au sync (asymetrique avec /license strict) ---
+    # Rationale : /hwid/sync ne peut etre appele qu'apres qu'une session client
+    # ait ete authentifiee avec CETTE license via /license (signature HMAC + key
+    # valide). Donc quand un client dit "je viens de spoofer, mon HWID est
+    # maintenant X", on considere qu'il en prend legitimement possession -- meme
+    # si X etait bound a une autre license via un binding orphelin (test
+    # precedent, cle supprimee mais binding survivant, etc).
+    # /license reste STRICT (rejette si HWID appartient a une autre cle).
+    stolen = (
         db.session.query(HwidBinding)
         .join(License, License.id == HwidBinding.license_id)
         .filter(
@@ -196,14 +200,20 @@ def hwid_sync():
             HwidBinding.license_id != lic.id,
             License.app_id == g.app.id,
         )
-        .first()
+        .all()
     )
-    if other_bind:
-        add_log(g.app.id, "hwid_sync_locked", ip, new_hwid, key,
-                f"HWID owned by lic#{other_bind.license_id}")
-        return jsonify(success=False, message="hwid already bound to another license"), 403
+    stolen_ids = [b.license_id for b in stolen]
+    for b in stolen:
+        db.session.delete(b)
+    if stolen_ids:
+        ClientSession.query.filter(
+            ClientSession.license_id.in_(stolen_ids),
+            ClientSession.hwid == new_hwid,
+        ).delete(synchronize_session=False)
+        add_log(g.app.id, "hwid_sync_steal", ip, new_hwid, key,
+                f"took HWID from lic#{','.join(str(x) for x in stolen_ids)}")
 
-    # Sinon: wipe l'ancien binding de CETTE license et pose le nouveau
+    # Wipe l'ancien binding de CETTE license et pose le nouveau
     HwidBinding.query.filter_by(license_id=lic.id).delete()
     db.session.add(HwidBinding(license_id=lic.id, hwid=new_hwid, ip=ip))
 
